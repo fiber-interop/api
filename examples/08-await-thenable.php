@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/08-await-thenable.php
+// any then(ok, fail) object is awaitable
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {

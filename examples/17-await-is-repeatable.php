@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/17-await-is-repeatable.php
+// an awaitable can be awaited repeatedly
 // An awaitable is a value that becomes available, not a message that is consumed.
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
 

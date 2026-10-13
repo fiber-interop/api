@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/05-late-result-ignored.php
+// a result arriving after a timeout is ignored
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {

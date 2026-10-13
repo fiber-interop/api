@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/04-timeout-leaves-task-running.php
+// await timeout throws; the task keeps running
 // Inside a task (the portable case). From {main}, whether await() can return before every task has
 // ended is runtime-specific: see the adapter's README.
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};

@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/15-in-place-foreign-fiber.php
+// foreign fibers wait in place inside run()
 use function async\{go, await, await_all, await_any, run, service, sleep, readable, writable};
 
 // a Fiber nobody's loop created, started inside run(): it counts as inside that run(), and the

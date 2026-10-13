@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/02-outside-run-throws.php
+// go/await/sleep throw outside run(); run() works
 use function async\{go, await, await_all, await_any, run, service, sleep, readable, writable};
 
 // go, await and the waits throw NotInRunException outside run(); run() itself works from {main}

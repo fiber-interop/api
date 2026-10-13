@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/11-readable-concurrent.php
+// several fibers wait readable() on one stream
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {

@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/07-rejected-non-throwable.php
+// non-Throwable rejection becomes RejectedException
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {

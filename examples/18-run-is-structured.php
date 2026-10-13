@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/18-run-is-structured.php
+// run() waits for every task started inside it
 use function async\{go, await, await_all, await_any, run, service, sleep, readable, writable};
 
 // run() returns only after every task started inside it finished, awaited or not, and rethrows

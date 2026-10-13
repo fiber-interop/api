@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/13-scope-inherited-by-go.php
+// go() tasks inherit the starter's Scope
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {

@@ -104,7 +104,13 @@ that outlives every request:
 $poller = \Scope::getRootScope()->run(fn() => async\go(function () { /* service */ }));
 ```
 
-The api never names `Scope` in its own signatures.
+The api never names `Scope` in its own signatures, and gives no scope functions of its own: `Scope`
+is the global `\Scope`, not something in `async\`.
+
+**Superglobals.** `$_GET`, `$_POST`, `$_COOKIE` and `$_FILES` are per scope: a new scope starts with
+copies of its creator's, and assignments inside a scope stay inside it. Adapters keep this true by
+calling `fiber_interop\scope\activate()` whenever the loop hands control to user code (see
+[Per-scope superglobals](https://github.com/fiber-interop/scope#per-scope-superglobals-polyfill)).
 
 ## Choosing an adapter
 
@@ -144,6 +150,10 @@ interface Adapter {
   timeout throw a `TimeoutException` and drop the late result. `$timeout === \PHP_FLOAT_MAX` means none.
 - Every wait follows the in-place rule above. Queued callbacks run in the scope they were queued
   from (`$scope = \Scope::getCurrent()` at queue time, `$scope->run($cb)` when firing).
+- Call `\fiber_interop\scope\activate()` (guard with `function_exists`) at every hand-off to user
+  code: task start, after a suspension resumes, before a queued callback, and after the outermost
+  wait returns to `{main}`. It is cheap when the scope has not changed and a no-op under the native
+  extension. Example 21 checks it.
 - Exceptions from tasks nobody awaits go to your loop's unhandled-error handler.
 - `service()` tasks must not keep the loop alive on your behalf: when your loop-driving wait (the
   one wrapping the outermost `run()`) has what it waited for, return even if service tasks still

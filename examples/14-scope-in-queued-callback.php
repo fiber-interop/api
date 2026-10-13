@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/14-scope-in-queued-callback.php
+// queued callbacks resume tasks in their own Scope
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {

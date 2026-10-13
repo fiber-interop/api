@@ -36,6 +36,7 @@ final class FiberAdapter implements Adapter
     {
         $task = new Task();
         $fiber = new \Fiber(function () use ($f, $task) {
+            $this->activate();
             try {
                 $task->settle(true, $f());
             } catch (\Throwable $e) {
@@ -141,6 +142,7 @@ final class FiberAdapter implements Adapter
                 }
             }
         }
+        $this->activate(); // after a resume, or back in {main} after the in-place loop
         [$ok, $value] = $result;
         if (!$ok) {
             throw $value;
@@ -151,7 +153,18 @@ final class FiberAdapter implements Adapter
     private function inScope(\Closure $cb): \Closure
     {
         $scope = \Scope::getCurrent();
-        return static fn(...$a) => $scope->run($cb, ...$a);
+        return function (...$a) use ($scope, $cb) {
+            $this->activate();
+            return $scope->run($cb, ...$a);
+        };
+    }
+
+    /** Hand-off to user code: make the live per-scope superglobals those of the current scope. */
+    private function activate(): void
+    {
+        if (\function_exists('fiber_interop\scope\activate')) {
+            \fiber_interop\scope\activate();
+        }
     }
 
     private function defer(\Closure $cb): void

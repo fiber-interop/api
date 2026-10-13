@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/10-await-any.php
+// await_any returns the first fulfilled result
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {

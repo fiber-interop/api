@@ -1,5 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/09-await-all.php
+// await_all returns results under the same keys
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {
