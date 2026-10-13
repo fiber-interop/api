@@ -3,10 +3,10 @@
 use function async\{go, await, await_all, await_any, run, service, sleep, readable, writable};
 
 // a failing service task (nobody awaits it, no run() owns it) must reach the adapter's error
-// handler (reported by the runner); it does not make run() throw
+// handler (reported by the runner). Whether run() then returns or the handler ends the process is
+// the loop's own policy, so nothing is printed after run()
 run(function () {
     echo "start\n";
     service(function () { throw new RuntimeException("nobody awaits me"); });
     sleep(0.05);
 });
-echo "run returned\n";
