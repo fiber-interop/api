@@ -184,7 +184,7 @@ final class FiberAdapter implements Adapter
                 break;
             }
         }
-        if ($this->ready) {
+        if ($ready || $this->ready) { // callbacks just ran may have settled what the caller waits for
             $wait = 0;
         } elseif ($next !== null) {
             $wait = max(0, $next - microtime(true));
