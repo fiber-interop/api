@@ -23,7 +23,13 @@ if ($phpunit === null) {
     exit(2);
 }
 putenv('FIBER_INTEROP_STRESS_BOOTSTRAP=' . realpath($bootstrap));
-$cmd = array_merge([PHP_BINARY, $phpunit, '--no-configuration', '--bootstrap', realpath($bootstrap), '--group', 'stress',
+// The test base class lives under this package's autoload-dev, which Composer ignores for a dependency,
+// so wrap the adapter's bootstrap in one that also loads it.
+$wrapper = tempnam(sys_get_temp_dir(), 'fiber-interop-stress-') . '.php';
+file_put_contents($wrapper, '<?php require ' . var_export(realpath($bootstrap), true) . '; require '
+    . var_export(dirname(__DIR__) . '/tests/Stress/StressCase.php', true) . ";\n");
+register_shutdown_function(static fn() => @unlink($wrapper));
+$cmd = array_merge([PHP_BINARY, $phpunit, '--no-configuration', '--bootstrap', $wrapper, '--group', 'stress',
     '--do-not-cache-result'], array_slice($argv, 2), [dirname(__DIR__) . '/tests/Stress']);
 $p = proc_open($cmd, [0 => STDIN, 1 => STDOUT, 2 => STDERR], $pipes);
 exit(proc_close($p));
