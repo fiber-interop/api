@@ -84,8 +84,13 @@ Rules every adapter honours (each has a conformance example):
   planned follow-up, which is why `CancelledException` already exists.
 - **Readiness** means the next operation will not block, as for `select()`: EOF, a peer close and
   an error all make `readable()` and `writable()` return (the following read or write returns
-  `''`/`false` without blocking). Closing a resource locally while another fiber waits on it is
-  undefined; adapters may throw, and conformance does not test it.
+  `''`/`false` without blocking). A local `fclose()` of a resource while fibers wait on it also
+  unblocks them, within 20 ms, with the wait returning normally; the next operation on the closed
+  resource then errors without blocking. Adapters implement this by sweeping: while any stream wait
+  is pending they check `is_resource()` on each waited stream at every loop iteration and from a
+  10 ms periodic timer, wake the waiters of a gone resource and drop the watcher, so a closed
+  resource is never handed to `stream_select()` or the loop. Stream filters cannot be used on
+  waited streams (a filtered stream cannot be cast for `select()`).
 - **Exceptions** thrown by a task are rethrown by `await()` unchanged. A promise rejected with a
   non-`Throwable` reason throws `async\RejectedException`; `getReason()` returns the raw reason.
 - **Unawaited task exceptions** are rethrown by the enclosing `run()`. Those of `service()` tasks

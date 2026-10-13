@@ -212,12 +212,23 @@ final class FiberAdapter implements Adapter
         } else {
             $wait = null;
         }
+        // Sweep: a resource closed locally wakes its waiters normally and is never given to stream_select.
+        foreach ([&$this->readers, &$this->writers] as &$list) {
+            foreach ($list as $id => [$res, $cb]) {
+                if (!is_resource($res)) {
+                    unset($list[$id]);
+                    $cb();
+                }
+            }
+        }
+        unset($list);
         if ($this->readers || $this->writers) {
+            $wait = $wait === null ? 0.01 : min($wait, 0.01); // re-sweep at least every 10 ms
             $r = array_column($this->readers, 0);
             $w = array_column($this->writers, 0);
             $e = [];
-            $sec = $wait === null ? null : (int) $wait;
-            if (@stream_select($r, $w, $e, $sec, $wait === null ? 0 : (int) (($wait - (int) $wait) * 1e6)) > 0) {
+            $sec = (int) $wait;
+            if (@stream_select($r, $w, $e, $sec, (int) (($wait - (int) $wait) * 1e6)) > 0) {
                 foreach ([[&$this->readers, $r], [&$this->writers, $w]] as [&$list, $hit]) {
                     foreach ($list as $id => [$res, $cb]) {
                         if (in_array($res, $hit, true)) {

@@ -1,6 +1,6 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/22-readiness-on-close.php
-// readable()/writable() return when the peer closes: readiness means the next operation will not block
+// readable()/writable() return on peer close and on local close: readiness means the next operation will not block
 use function async\{go, await, run, sleep, readable, writable};
 
 run(function () {
@@ -32,4 +32,24 @@ run(function () {
         echo "write failed: yes\n";
     }
     fclose($a);
+
+    // (c) a local fclose() of the resource unblocks its waiters promptly
+    [$a, $b] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);
+    stream_set_blocking($a, false);
+    stream_set_blocking($b, false);
+    $closedAt = 0;
+    $closer = go(function () use ($a, &$closedAt) {
+        sleep(0.01);
+        $closedAt = hrtime(true);
+        fclose($a);
+    });
+    $waiter = go(function () use ($a) {
+        readable($a, 2.0);
+        return hrtime(true);
+    });
+    $wokeAt = await($waiter);
+    await($closer);
+    echo 'readable after local close: ', ($wokeAt - $closedAt) / 1e9 <= 0.1 ? 'yes' : 'no', "\n";
+    echo 'resource closed: ', is_resource($a) ? 'no' : 'yes', "\n";
+    fclose($b);
 });
