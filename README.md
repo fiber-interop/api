@@ -29,7 +29,7 @@ function go(callable $f, mixed ...$args): object;
 function await(object $awaitable, float $timeout = \PHP_FLOAT_MAX): mixed;
 function await_all(array $awaitables, float $timeout = \PHP_FLOAT_MAX): array;
 function await_any(array $awaitables, float $timeout = \PHP_FLOAT_MAX): mixed;
-function run(callable $f, float $timeout = \PHP_FLOAT_MAX): mixed;
+function run(callable $f, mixed ...$args): mixed;
 function sleep(float $seconds): void;
 function readable(mixed $resource, float $timeout = \PHP_FLOAT_MAX): mixed;
 function writable(mixed $resource, float $timeout = \PHP_FLOAT_MAX): mixed;
@@ -47,7 +47,7 @@ function adapter(): Adapter;
   first exception (in key order) is rethrown.
 - `await_any()` returns the first result to fulfil; it throws only if all reject (the first
   rejection's exception).
-- `run($f)` is `await(go($f))` and also works from plain `{main}` with no loop running.
+- `run($f, ...$args)` is `await(go($f, ...$args))` (no timeout; use `await(go(...), $t)`) and also works from plain `{main}` with no loop running.
 - `sleep()` suspends cooperatively. `readable()`/`writable()` return the resource, so
   `fread(readable($fp), 8192)` works; several fibers may wait on the same stream.
 

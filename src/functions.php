@@ -149,10 +149,10 @@ function await_any(array $awaitables, float $timeout = \PHP_FLOAT_MAX): mixed
     return await($d, $timeout);
 }
 
-/** await(go($f), $timeout). Valid from {main} with no loop running: the adapter runs its loop until done. */
-function run(callable $f, float $timeout = \PHP_FLOAT_MAX): mixed
+/** await(go($f, ...$args)). Valid from {main} with no loop running. For a timeout use await(go(...), $t). */
+function run(callable $f, mixed ...$args): mixed
 {
-    return await(go($f), $timeout);
+    return await(go($f, ...$args));
 }
 
 /** Suspend the current fiber for $seconds without blocking others. May throw CancelledException. */
