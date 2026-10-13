@@ -82,6 +82,10 @@ Rules every adapter honours (each has a conformance example):
   A timeout is a deadline on waiting, not on execution: a task that never finishes holds its
   `run()` open, and nothing in 1.0 can stop it from outside. Cooperative cancellation is the
   planned follow-up, which is why `CancelledException` already exists.
+- **Readiness** means the next operation will not block, as for `select()`: EOF, a peer close and
+  an error all make `readable()` and `writable()` return (the following read or write returns
+  `''`/`false` without blocking). Closing a resource locally while another fiber waits on it is
+  undefined; adapters may throw, and conformance does not test it.
 - **Exceptions** thrown by a task are rethrown by `await()` unchanged. A promise rejected with a
   non-`Throwable` reason throws `async\RejectedException`; `getReason()` returns the raw reason.
 - **Unawaited task exceptions** are rethrown by the enclosing `run()`. Those of `service()` tasks

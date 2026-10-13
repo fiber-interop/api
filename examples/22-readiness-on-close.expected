@@ -1,0 +1,5 @@
+readable after peer close: yes
+read after eof: empty
+writable after peer close: yes
+write failed: yes
+error reported: no
