@@ -83,8 +83,16 @@ The api never names `Scope` in its own signatures.
 
 ## Choosing an adapter
 
-Adapter packages register themselves: their Composer `files` autoload calls `async\setup()` when
-their loop's classes exist, so `composer require react/event-loop fiber-interop/react` needs no
+Adapter packages register themselves as candidates from their Composer `files` autoload; nothing
+is instantiated until the first api call:
+
+```php
+// src/register.php, listed under "autoload": {"files": [...]}
+if (class_exists(React\EventLoop\Loop::class)) async\register(fn() => new FiberInterop\React\Adapter(), 'fiber-interop/react');
+```
+
+On first use an explicit `async\setup()` wins; otherwise a single candidate is built and used; two
+or more throw `NotConfiguredException` naming them. So `composer require react/event-loop fiber-interop/react` needs no
 code. With none installed, the first call throws `async\NotConfiguredException` listing the adapter
 packages. To pick one explicitly, call `async\setup(new SomeAdapter())` early. `setup()` with an
 adapter of the class already set is a no-op; one of another class throws `\LogicException`.
@@ -139,6 +147,14 @@ unhandled-exception rule is checked: only `16-unhandled-exception-reaches-handle
 A single example runs by hand with `php -d auto_prepend_file=conformance-bootstrap.php examples/01-go-await.php`.
 
 This package's own tests (`vendor/bin/phpunit`) run the set under the reference adapter.
+
+## What the conformance set does not prove
+
+- `await_all()`/`await_any()` are implemented in the api on top of `await()` and `go()`, so they
+  test the adapter only indirectly.
+- Queued-callback scope is observed through a task resumed by a timer and by IO; a fiber keeps its
+  own scope, so an adapter that forgets to wrap its internal callbacks can still pass.
+- Unhandled errors are only checked as "reported, not dropped" (stderr or exit status), not where.
 
 ## License
 

@@ -12,7 +12,7 @@ final class SetupTest extends TestCase
 {
     protected function tearDown(): void
     {
-        Registry::$adapter = null;
+        Registry::reset();
     }
 
     public function testNotConfigured(): void
@@ -35,5 +35,33 @@ final class SetupTest extends TestCase
         \async\setup(new FiberAdapter());
         $this->expectException(\LogicException::class);
         \async\setup($this->createStub(\async\Adapter::class));
+    }
+
+    public function testSingleCandidateResolvesLazily(): void
+    {
+        $made = 0;
+        \async\register(function () use (&$made) { $made++; return new FiberAdapter(); }, 'vendor/one');
+        $this->assertSame(0, $made);
+        $this->assertInstanceOf(FiberAdapter::class, \async\adapter());
+        \async\adapter();
+        $this->assertSame(1, $made);
+    }
+
+    public function testTwoCandidatesThrowAtFirstUse(): void
+    {
+        \async\register(fn() => new FiberAdapter(), 'vendor/one');
+        \async\register(fn() => new FiberAdapter(), 'vendor/two');
+        $this->expectException(NotConfiguredException::class);
+        $this->expectExceptionMessage('vendor/one, vendor/two');
+        \async\adapter();
+    }
+
+    public function testSetupBeatsCandidates(): void
+    {
+        \async\register(fn() => throw new \LogicException('must not be built'), 'vendor/one');
+        \async\register(fn() => throw new \LogicException('must not be built'), 'vendor/two');
+        $a = new FiberAdapter();
+        \async\setup($a);
+        $this->assertSame($a, \async\adapter());
     }
 }

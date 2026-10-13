@@ -28,10 +28,34 @@ function setup(Adapter $adapter): void
     }
 }
 
-/** The configured adapter. @throws NotConfiguredException when none is set up. */
+/**
+ * Offer an adapter as a candidate; called by adapter packages from their Composer `files` autoload.
+ * Nothing is instantiated here. On first use, an explicit setup() wins; otherwise a single
+ * candidate is instantiated via $factory; two or more make adapter() throw naming the packages.
+ *
+ * @param callable(): Adapter $factory
+ * @param string $package Composer package name, used in messages
+ */
+function register(callable $factory, string $package): void
+{
+    Registry::$candidates[$package] = $factory;
+}
+
+/** The configured adapter, resolving a single registered candidate on first use. @throws NotConfiguredException */
 function adapter(): Adapter
 {
-    return Registry::$adapter ?? throw new NotConfiguredException();
+    if (Registry::$adapter !== null) {
+        return Registry::$adapter;
+    }
+    $c = Registry::$candidates;
+    if (\count($c) > 1) {
+        throw new NotConfiguredException('Several fiber-interop adapters are installed (' . \implode(', ', \array_keys($c))
+            . '); call async\\setup() with the one you want.');
+    }
+    if ($c === []) {
+        throw new NotConfiguredException();
+    }
+    return Registry::$adapter = \current($c)();
 }
 
 /**
