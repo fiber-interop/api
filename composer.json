@@ -24,7 +24,8 @@
         }
     },
     "bin": [
-        "bin/fiber-interop-conformance"
+        "bin/fiber-interop-conformance",
+        "bin/fiber-interop-stress"
     ],
     "extra": {
         "branch-alias": {

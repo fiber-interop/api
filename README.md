@@ -52,7 +52,7 @@ function adapter(): Adapter;
   rejection's exception).
 - `run($f, ...$args)` is the only entry point, and it is structured. It runs `$f` as a task and
   returns only when `$f` has returned **and every task started inside it, transitively, has
-  finished**, awaited or not. It rethrows `$f`'s exception, else the first exception of a child
+  finished**, awaited or not. It rethrows `$f`'s exception, else the first exception (by time of failure) of a child
   nobody awaited, else returns `$f`'s result. It works the same from plain `{main}` with no loop
   running and nested inside a task; a nested `run()` waits only for what was started inside it.
   There is no timeout on `run()`; use `await(go(...), $t)` inside it.
@@ -79,6 +79,9 @@ Rules every adapter honours (each has a conformance example):
 
 - **Timeout** throws an object implementing `async\TimeoutException` (`async\Timeout` if the loop
   has no own class). The awaited task keeps running and its later result is ignored.
+  A timeout is a deadline on waiting, not on execution: a task that never finishes holds its
+  `run()` open, and nothing in 1.0 can stop it from outside. Cooperative cancellation is the
+  planned follow-up, which is why `CancelledException` already exists.
 - **Exceptions** thrown by a task are rethrown by `await()` unchanged. A promise rejected with a
   non-`Throwable` reason throws `async\RejectedException`; `getReason()` returns the raw reason.
 - **Unawaited task exceptions** are rethrown by the enclosing `run()`. Those of `service()` tasks
@@ -194,10 +197,13 @@ example's output (yes when the example wrote to stderr or exited non-zero), whic
 unhandled-exception rule is checked: only `16-unhandled-exception-reaches-handler` must say yes.
 A single example runs by hand with `php -d auto_prepend_file=conformance-bootstrap.php examples/01-go-await.php`.
 
-This package's own tests (`vendor/bin/phpunit`) run the set under the reference adapter.
+This package's own tests (`vendor/bin/phpunit`) run the set under the reference adapter, plus the stress tier (`--group stress` or `--exclude-group stress` to select). Adapter packages run the stress tier with `vendor/bin/fiber-interop-stress <bootstrap.php>`; a failure prints the seed, replay it with `FIBER_INTEROP_STRESS_SEED`.
 
 ## What the conformance set does not prove
 
+- It tests deterministic interleavings only. Races, contention and randomised timing are covered
+  by the separate stress tier (`tests/Stress`, run against an adapter with
+  `bin/fiber-interop-stress <bootstrap.php>`), which checks invariants rather than fixed output.
 - `await_all()`/`await_any()` are implemented in the api on top of `await()` and `go()`, so they
   test the adapter only indirectly.
 - Queued-callback scope is observed through a task resumed by a timer and by IO; a fiber keeps its

@@ -82,7 +82,9 @@ final class Frame
                 if ($entry === null || $entry->awaited) {
                     throw $e;
                 }
-                $entry->error = $e; // the enclosing run() or a later await() rethrows it
+                $entry->error = $e;
+                $entry->failedAt = ++TaskEntry::$failures;
+                // the enclosing run() or a later await() rethrows it
                 return null;
             } finally {
                 Frame::pop($k);

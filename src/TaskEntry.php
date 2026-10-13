@@ -9,4 +9,7 @@ final class TaskEntry
 {
     public bool $awaited = false;
     public ?\Throwable $error = null;
+    /** Monotonic failure order, so run() can rethrow the exception that happened first. */
+    public int $failedAt = 0;
+    public static int $failures = 0;
 }

@@ -192,10 +192,14 @@ function run(callable $f, mixed ...$args): mixed
     if ($error !== null) {
         throw $error;
     }
+    $first = null;
     foreach ($frame->entries as $entry) {
-        if ($entry->error !== null && !$entry->awaited) {
-            throw $entry->error;
+        if ($entry->error !== null && !$entry->awaited && ($first === null || $entry->failedAt < $first->failedAt)) {
+            $first = $entry;
         }
+    }
+    if ($first !== null) {
+        throw $first->error;
     }
     return $result;
 }

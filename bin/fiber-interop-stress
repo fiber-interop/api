@@ -1,0 +1,29 @@
+#!/usr/bin/env php
+<?php
+// Usage: fiber-interop-stress <bootstrap.php> [phpunit args ...]
+// Runs the stress tier (tests/Stress, PHPUnit group "stress") against the adapter the bootstrap registers.
+// The bootstrap must load the autoloader and register the adapter, exactly as for fiber-interop-conformance.
+// Needs PHPUnit: found via the current project's vendor/bin/phpunit, else this package's.
+// Env: FIBER_INTEROP_STRESS_ITERATIONS (default 200), FIBER_INTEROP_STRESS_SEED (replay a failure).
+
+$bootstrap = $argv[1] ?? null;
+if ($bootstrap === null || !is_file($bootstrap)) {
+    fwrite(STDERR, "usage: fiber-interop-stress <bootstrap.php> [phpunit args ...]\n");
+    exit(2);
+}
+$phpunit = null;
+foreach ([getcwd() . '/vendor/bin/phpunit', dirname(__DIR__) . '/vendor/bin/phpunit', dirname(__DIR__, 3) . '/bin/phpunit'] as $c) {
+    if (is_file($c)) {
+        $phpunit = $c;
+        break;
+    }
+}
+if ($phpunit === null) {
+    fwrite(STDERR, "fiber-interop-stress: phpunit not found (composer require --dev phpunit/phpunit)\n");
+    exit(2);
+}
+putenv('FIBER_INTEROP_STRESS_BOOTSTRAP=' . realpath($bootstrap));
+$cmd = array_merge([PHP_BINARY, $phpunit, '--no-configuration', '--bootstrap', realpath($bootstrap), '--group', 'stress',
+    '--do-not-cache-result'], array_slice($argv, 2), [dirname(__DIR__) . '/tests/Stress']);
+$p = proc_open($cmd, [0 => STDIN, 1 => STDOUT, 2 => STDERR], $pipes);
+exit(proc_close($p));
