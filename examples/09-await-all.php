@@ -2,15 +2,17 @@
 // Run: php -d auto_prepend_file=<your bootstrap> examples/09-await-all.php
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
 
-print_r(await_all([
-    "slow" => go(function () { sleep(0.03); return 1; }),
-    "fast" => go(function () { sleep(0.01); return 2; }),
-]));
-try {
-    await_all([
-        go(function () { sleep(0.01); throw new LogicException("first"); }),
-        go(function () { sleep(0.03); echo "second settled\n"; return 3; }),
-    ]);
-} catch (LogicException $e) {
-    echo "caught ", $e->getMessage(), " after all settled\n";
-}
+run(function () {
+    print_r(await_all([
+        "slow" => go(function () { sleep(0.03); return 1; }),
+        "fast" => go(function () { sleep(0.01); return 2; }),
+    ]));
+    try {
+        await_all([
+            go(function () { sleep(0.01); throw new LogicException("first"); }),
+            go(function () { sleep(0.03); echo "second settled\n"; return 3; }),
+        ]);
+    } catch (LogicException $e) {
+        echo "caught ", $e->getMessage(), " after all settled\n";
+    }
+});

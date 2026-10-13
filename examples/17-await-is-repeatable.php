@@ -4,15 +4,17 @@
 use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {
-    $t = go(function () { sleep(0.01); return 42; });
-    $a = go(fn() => await($t));     // two concurrent awaiters
-    $b = go(fn() => await($t));
-    echo "concurrent: ", await($a), " ", await($b), "\n";
-    echo "again: ", await($t), " ", await($t), "\n";
+    run(function () {
+        $t = go(function () { sleep(0.01); return 42; });
+        $a = go(fn() => await($t));     // two concurrent awaiters
+        $b = go(fn() => await($t));
+        echo "concurrent: ", await($a), " ", await($b), "\n";
+        echo "again: ", await($t), " ", await($t), "\n";
 
-    $f = go(function () { sleep(0.01); throw new RuntimeException("once"); });
-    $first = $second = null;
-    try { await($f); } catch (RuntimeException $e) { $first = $e; }
-    try { await($f); } catch (RuntimeException $e) { $second = $e; }
-    echo "same exception object: ", ($first !== null && $first === $second) ? "yes" : "no", "\n";
+        $f = go(function () { sleep(0.01); throw new RuntimeException("once"); });
+        $first = $second = null;
+        try { await($f); } catch (RuntimeException $e) { $first = $e; }
+        try { await($f); } catch (RuntimeException $e) { $second = $e; }
+        echo "same exception object: ", ($first !== null && $first === $second) ? "yes" : "no", "\n";
+    });
 });

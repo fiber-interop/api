@@ -1,0 +1,6 @@
+inner child done
+nested run returned: inner f
+nested run rethrew: inner unawaited
+outer child done
+outer run returned
+error reported: no
