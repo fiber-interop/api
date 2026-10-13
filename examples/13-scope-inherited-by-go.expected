@@ -1,0 +1,4 @@
+main is root: true
+task sees creator scope: true
+task from main sees root: true
+error reported: no

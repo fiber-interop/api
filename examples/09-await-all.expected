@@ -1,0 +1,8 @@
+Array
+(
+    [slow] => 1
+    [fast] => 2
+)
+second settled
+caught first after all settled
+error reported: no

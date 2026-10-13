@@ -1,0 +1,40 @@
+#!/usr/bin/env php
+<?php
+// Usage: fiber-interop-conformance <bootstrap.php> [example-name ...]
+// Runs every examples/*.php with the bootstrap prepended (it must load the autoloader and
+// register an adapter) and diffs stdout against the .expected file. A last line
+// "error reported: yes|no" is appended: yes when the run wrote to stderr or exited non-zero.
+// Exit status 0 when every example matches.
+
+$bootstrap = $argv[1] ?? null;
+if ($bootstrap === null || !is_file($bootstrap)) {
+    fwrite(STDERR, "usage: fiber-interop-conformance <bootstrap.php> [example-name ...]\n");
+    exit(2);
+}
+$bootstrap = realpath($bootstrap);
+$only = array_slice($argv, 2);
+$failed = 0;
+foreach (glob(dirname(__DIR__) . '/examples/*.php') as $file) {
+    $name = basename($file, '.php');
+    if ($only && !in_array($name, $only, true)) {
+        continue;
+    }
+    $cmd = [PHP_BINARY, '-d', 'display_errors=stderr', '-d', 'auto_prepend_file=' . $bootstrap, $file];
+    $p = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+    $out = stream_get_contents($pipes[1]);
+    $err = stream_get_contents($pipes[2]);
+    $code = proc_close($p);
+    $out .= 'error reported: ' . ($err !== '' || $code !== 0 ? 'yes' : 'no') . "\n";
+    $expected = (string) @file_get_contents(substr($file, 0, -4) . '.expected');
+    if ($out === $expected) {
+        echo "ok   $name\n";
+        continue;
+    }
+    $failed++;
+    echo "FAIL $name\n--- expected\n$expected--- actual\n$out";
+    if ($err !== '') {
+        echo "--- stderr\n$err";
+    }
+}
+echo $failed ? "$failed example(s) failed\n" : "all examples passed\n";
+exit($failed ? 1 : 0);
