@@ -129,6 +129,7 @@ Implement `async\Adapter`:
 ```php
 interface Adapter {
     public function go(\Closure $f): object;         // schedule $f; return your awaitable
+    public function service(\Closure $f): object;    // like go(), but must not keep the loop alive
     public function canAwait(object $o): bool;       // true for your own awaitables
     public function await(object $o, float $timeout): mixed;  // also handle then-ables
     public function sleep(float $seconds): void;
@@ -144,6 +145,9 @@ interface Adapter {
 - Every wait follows the in-place rule above. Queued callbacks run in the scope they were queued
   from (`$scope = \Scope::getCurrent()` at queue time, `$scope->run($cb)` when firing).
 - Exceptions from tasks nobody awaits go to your loop's unhandled-error handler.
+- `service()` tasks must not keep the loop alive on your behalf: when your loop-driving wait (the
+  one wrapping the outermost `run()`) has what it waited for, return even if service tasks still
+  run. What happens to them afterwards (left parked, or cancelled) is runtime-specific.
 - Do not special-case `{main}`: the api only calls you inside `run()`. A wait from `{main}` happens
   only for a top-level `run()` and must drive the loop in place, exactly like a foreign fiber.
 - Exceptions of api tasks inside a `run()` frame are caught by the api before they reach you when

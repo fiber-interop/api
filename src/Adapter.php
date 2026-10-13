@@ -21,6 +21,8 @@ namespace async;
 interface Adapter
 {
     public function go(\Closure $f): object;
+    /** Like go(), but the task must not keep the loop alive: a loop-driving wait may return while it still runs. */
+    public function service(\Closure $f): object;
     public function canAwait(object $o): bool;
     public function await(object $o, float $timeout): mixed;
     public function sleep(float $seconds): void;

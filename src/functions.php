@@ -213,7 +213,7 @@ function service(callable $f, mixed ...$args): object
 {
     Frame::current();
     $scope = \Scope::getRootScope();
-    return (new Frame(true))->start(static fn() => $scope->run($f, ...$args));
+    return (new Frame(true))->start(static fn() => $scope->run($f, ...$args), true);
 }
 
 /** Suspend the current fiber for $seconds without blocking others. May throw CancelledException. */

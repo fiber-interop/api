@@ -51,6 +51,12 @@ final class FiberAdapter implements Adapter
         return $task;
     }
 
+    /** Same as go(): wait() returns as soon as its own condition settles, so no task keeps it alive. */
+    public function service(\Closure $f): object
+    {
+        return $this->go($f);
+    }
+
     public function canAwait(object $o): bool
     {
         return $o instanceof Task;

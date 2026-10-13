@@ -68,12 +68,13 @@ final class Frame
     }
 
     /** Starts $f as a task of this frame; the task's own go() calls land in this frame too. */
-    public function start(\Closure $f): object
+    public function start(\Closure $f, bool $service = false): object
     {
         $entry = $this->detached ? null : new TaskEntry();
         $frame = $this;
         $this->pending++;
-        $task = adapter()->go(static function () use ($f, $frame, $entry) {
+        $a = adapter();
+        $task = $a->{$service ? 'service' : 'go'}(static function () use ($f, $frame, $entry) {
             $k = Frame::push($frame);
             try {
                 return $f();
