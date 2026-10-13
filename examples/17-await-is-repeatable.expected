@@ -1,0 +1,4 @@
+concurrent: 42 42
+again: 42 42
+same exception object: yes
+error reported: no
