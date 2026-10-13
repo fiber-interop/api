@@ -27,5 +27,10 @@
     },
     "bin": [
         "bin/fiber-interop-conformance"
-    ]
+    ],
+    "extra": {
+        "branch-alias": {
+            "dev-main": "0.1.x-dev"
+        }
+    }
 }
