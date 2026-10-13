@@ -1,5 +1,3 @@
 /vendor/
 composer.lock
 .phpunit.cache/
-composer.local.json
-composer.local.lock
