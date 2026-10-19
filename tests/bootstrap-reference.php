@@ -5,4 +5,4 @@ if (!class_exists('Scope')) { // fiber-interop/scope not installed: use the loca
     require_once __DIR__ . '/Support/ScopeStub.php';
 }
 require_once __DIR__ . '/Support/FiberAdapter.php';
-async\setup(new async\Tests\Support\FiberAdapter());
+fiber\setup(new fiber\Tests\Support\FiberAdapter());

@@ -1,9 +1,9 @@
 <?php
-namespace async\Tests\Support;
+namespace fiber\Tests\Support;
 
-use async\Adapter;
-use async\RejectedException;
-use async\Timeout;
+use fiber\Adapter;
+use fiber\RejectedException;
+use fiber\Timeout;
 
 /**
  * Reference adapter for the conformance set: a single-threaded scheduler on raw Fibers,

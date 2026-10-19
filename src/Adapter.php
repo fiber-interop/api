@@ -1,8 +1,8 @@
 <?php
-namespace async;
+namespace fiber;
 
 /**
- * What an event loop implements to serve the async\ functions.
+ * What an event loop implements to serve the fiber\ functions.
  *
  * - go(): start $f concurrently and return an opaque awaitable. The api has already wrapped
  *   $f so it runs in the scope captured at go(); the adapter only schedules it.

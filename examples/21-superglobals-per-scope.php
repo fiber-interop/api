@@ -1,7 +1,7 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/21-superglobals-per-scope.php
 // $_GET is per scope; each scope sees its own
-use function async\{go, await_all, run, sleep};
+use function fiber\{go, await_all, run, sleep};
 
 $root = $_GET;
 run(function () {

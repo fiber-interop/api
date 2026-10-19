@@ -1,5 +1,5 @@
 <?php
-namespace async;
+namespace fiber;
 
 /**
  * @internal Minimal then-able used by await_any(); every adapter can await it because

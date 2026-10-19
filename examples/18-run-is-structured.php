@@ -1,7 +1,7 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/18-run-is-structured.php
 // run() waits for every task started inside it
-use function async\{go, await, await_all, await_any, run, service, sleep, readable, writable};
+use function fiber\{go, await, await_all, await_any, run, service, sleep, readable, writable};
 
 // run() returns only after every task started inside it finished, awaited or not, and rethrows
 // the exception of a child nobody awaited once the other children are done

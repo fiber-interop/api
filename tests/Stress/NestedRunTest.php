@@ -1,8 +1,8 @@
 <?php
-namespace async\Tests\Stress;
+namespace fiber\Tests\Stress;
 
 use PHPUnit\Framework\Attributes\Group;
-use function async\{go, run, sleep};
+use function fiber\{go, run, sleep};
 
 #[Group('stress')]
 final class NestedRunTest extends StressCase

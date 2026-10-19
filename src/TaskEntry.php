@@ -1,5 +1,5 @@
 <?php
-namespace async;
+namespace fiber;
 
 /**
  * @internal A task registered in a run() frame. When it fails before anyone awaited it, the

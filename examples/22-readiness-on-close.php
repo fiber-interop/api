@@ -1,7 +1,7 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/22-readiness-on-close.php
 // readable()/writable() return on peer close and on local close: readiness means the next operation will not block
-use function async\{go, await, run, sleep, readable, writable};
+use function fiber\{go, await, run, sleep, readable, writable};
 
 run(function () {
     // (a) a reader waiting on A wakes when the peer B closes; the read does not block

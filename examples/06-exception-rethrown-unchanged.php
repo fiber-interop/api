@@ -1,7 +1,7 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/06-exception-rethrown-unchanged.php
 // task exceptions are rethrown unchanged
-use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
+use function fiber\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {
     final class MyError extends RuntimeException {}

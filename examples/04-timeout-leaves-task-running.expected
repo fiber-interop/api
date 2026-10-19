@@ -1,4 +1,4 @@
-timeout implements async\TimeoutException
+timeout implements fiber\TimeoutException
 task finished
 after
 error reported: no

@@ -1,5 +1,5 @@
 <?php
-namespace async;
+namespace fiber;
 
 /** @internal Holds the configured adapter and the run() frames. Tests reset it with Registry::reset(). */
 final class Registry

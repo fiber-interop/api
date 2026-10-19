@@ -1,7 +1,7 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/12-writable.php
 // writable() waits and returns the resource
-use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
+use function fiber\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {
     [$r, $w] = stream_socket_pair(STREAM_PF_UNIX, STREAM_SOCK_STREAM, STREAM_IPPROTO_IP);

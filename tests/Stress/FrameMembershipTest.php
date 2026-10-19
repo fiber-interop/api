@@ -1,10 +1,10 @@
 <?php
-namespace async\Tests\Stress;
+namespace fiber\Tests\Stress;
 
-use async\NotInRunException;
-use async\Registry;
+use fiber\NotInRunException;
+use fiber\Registry;
 use PHPUnit\Framework\Attributes\Group;
-use function async\{go, run, sleep};
+use function fiber\{go, run, sleep};
 
 #[Group('stress')]
 final class FrameMembershipTest extends StressCase

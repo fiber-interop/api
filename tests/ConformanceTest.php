@@ -1,5 +1,5 @@
 <?php
-namespace async\Tests;
+namespace fiber\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;

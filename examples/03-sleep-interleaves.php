@@ -1,7 +1,7 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/03-sleep-interleaves.php
 // sleep() interleaves tasks by duration
-use function async\{go, await, await_all, await_any, run, sleep, readable, writable};
+use function fiber\{go, await, await_all, await_any, run, sleep, readable, writable};
 
 run(function () {
     run(function () {

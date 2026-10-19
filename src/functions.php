@@ -2,11 +2,11 @@
 /**
  * fiber-interop/api: one surface for fiber-based concurrency.
  *
- * Global names (\go() etc.) are deliberately not declared; everything lives in async\.
+ * Global names (\go() etc.) are deliberately not declared; everything lives in fiber\.
  */
-namespace async;
+namespace fiber;
 
-if (\function_exists('async\go')) {
+if (\function_exists('fiber\go')) {
     return;
 }
 
@@ -23,7 +23,7 @@ function setup(Adapter $adapter): void
         Registry::$adapter = $adapter;
     } elseif (\get_class($current) !== \get_class($adapter)) {
         throw new \LogicException(\sprintf(
-            'fiber-interop adapter %s is already set up; refusing %s. Call async\setup() once with the adapter you want.',
+            'fiber-interop adapter %s is already set up; refusing %s. Call fiber\setup() once with the adapter you want.',
             \get_class($current), \get_class($adapter)));
     }
 }
@@ -50,7 +50,7 @@ function adapter(): Adapter
     $c = Registry::$candidates;
     if (\count($c) > 1) {
         throw new NotConfiguredException('Several fiber-interop adapters are installed (' . \implode(', ', \array_keys($c))
-            . '); call async\\setup() with the one you want.');
+            . '); call fiber\\setup() with the one you want.');
     }
     if ($c === []) {
         throw new NotConfiguredException();

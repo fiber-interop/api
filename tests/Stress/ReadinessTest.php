@@ -1,8 +1,8 @@
 <?php
-namespace async\Tests\Stress;
+namespace fiber\Tests\Stress;
 
 use PHPUnit\Framework\Attributes\Group;
-use function async\{go, readable, run};
+use function fiber\{go, readable, run};
 
 #[Group('stress')]
 final class ReadinessTest extends StressCase
@@ -38,7 +38,7 @@ final class ReadinessTest extends StressCase
                         while (true) {
                             try {
                                 readable($r, mt_rand(300, 2000) / 1e6);
-                            } catch (\async\TimeoutException) {
+                            } catch (\fiber\TimeoutException) {
                                 $timeouts++;
                                 if ($quitter) {
                                     return; // a reader giving up must not hurt the others

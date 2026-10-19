@@ -1,7 +1,7 @@
 <?php
 // Run: php -d auto_prepend_file=<your bootstrap> examples/19-nested-run.php
 // nested run() waits only for its own tasks
-use function async\{go, await, await_all, await_any, run, service, sleep, readable, writable};
+use function fiber\{go, await, await_all, await_any, run, service, sleep, readable, writable};
 
 // run() inside a task behaves the same, and waits only for what was started inside it
 run(function () {

@@ -1,6 +1,6 @@
 # fiber-interop/api
 
-One surface for fiber-based concurrency. Write a library once against `async\go()`, `async\await()`
+One surface for fiber-based concurrency. Write a library once against `fiber\go()`, `fiber\await()`
 and friends; it runs unchanged on phasync, Revolt (and therefore AMPHP and ReactPHP), and natively
 on AMPHP and ReactPHP. PHP 8.1+.
 
@@ -9,7 +9,7 @@ composer require fiber-interop/api fiber-interop/revolt   # or /phasync, /amp, /
 ```
 
 ```php
-use function async\{run, go, await, await_all, sleep, readable};
+use function fiber\{run, go, await, await_all, sleep, readable};
 
 run(function () use ($socket) {
     $a = go(fn() => strtoupper('a'));
@@ -20,12 +20,12 @@ run(function () use ($socket) {
 });   // returns when everything started inside it has finished
 ```
 
-The global names (`\go()` and so on) are not taken; everything lives in `async\`.
+The global names (`\go()` and so on) are not taken; everything lives in `fiber\`.
 
 ## Functions
 
 ```php
-namespace async;
+namespace fiber;
 
 function go(callable $f, mixed ...$args): object;
 function await(object $awaitable, float $timeout = \PHP_FLOAT_MAX): mixed;
@@ -62,7 +62,7 @@ function adapter(): Adapter;
   `run()` returns is runtime-specific, so write services to be restartable. Its failures, and those
   of tasks it starts without awaiting, go to the adapter's unhandled-error handler.
 - `go`, `await`, `await_all`, `await_any`, `sleep`, `readable` and `writable` throw
-  `async\NotInRunException` (a `LogicException`) outside `run()`.
+  `fiber\NotInRunException` (a `LogicException`) outside `run()`.
 - `sleep()` suspends cooperatively. `readable()`/`writable()` return the resource, so
   `fread(readable($fp), 8192)` works; several fibers may wait on the same stream.
 
@@ -77,7 +77,7 @@ started it.
 
 Rules every adapter honours (each has a conformance example):
 
-- **Timeout** throws an object implementing `async\TimeoutException` (`async\Timeout` if the loop
+- **Timeout** throws an object implementing `fiber\TimeoutException` (`fiber\Timeout` if the loop
   has no own class). The awaited task keeps running and its later result is ignored.
   A timeout is a deadline on waiting, not on execution: a task that never finishes holds its
   `run()` open, and nothing in 1.0 can stop it from outside. Cooperative cancellation is the
@@ -92,12 +92,12 @@ Rules every adapter honours (each has a conformance example):
   resource is never handed to `stream_select()` or the loop. Stream filters cannot be used on
   waited streams (a filtered stream cannot be cast for `select()`).
 - **Exceptions** thrown by a task are rethrown by `await()` unchanged. A promise rejected with a
-  non-`Throwable` reason throws `async\RejectedException`; `getReason()` returns the raw reason.
+  non-`Throwable` reason throws `fiber\RejectedException`; `getReason()` returns the raw reason.
 - **Unawaited task exceptions** are rethrown by the enclosing `run()`. Those of `service()` tasks
   (which no `run()` owns) go to the loop's unhandled-error mechanism (Revolt's error handler,
   React's rejection handler, phasync's context handler). Never silently dropped.
 - **Cancellation** is not in 1.0. `sleep()` and the waits may throw an object implementing
-  `async\CancelledException` when the owning loop cancels the task.
+  `fiber\CancelledException` when the owning loop cancels the task.
 - **Foreign fibers.** Waiting from a fiber the adapter did not create (and not `{main}`) does not
   suspend that fiber; the adapter runs its loop in place until the wait completes. Nested in-place
   waits across two different loops can order badly; adapters raise a clear error after the timeout
@@ -113,11 +113,11 @@ IO callbacks in the scope they were queued from. The root scope is a process-wid
 that outlives every request:
 
 ```php
-$poller = \Scope::getRootScope()->run(fn() => async\go(function () { /* service */ }));
+$poller = \Scope::getRootScope()->run(fn() => fiber\go(function () { /* service */ }));
 ```
 
 The api never names `Scope` in its own signatures, and gives no scope functions of its own: `Scope`
-is the global `\Scope`, not something in `async\`.
+is the global `\Scope`, not something in `fiber\`.
 
 **Superglobals.** `$_GET`, `$_POST`, `$_COOKIE` and `$_FILES` are per scope: a new scope starts with
 copies of its creator's, and assignments inside a scope stay inside it. Adapters keep this true by
@@ -131,18 +131,18 @@ is instantiated until the first api call:
 
 ```php
 // src/register.php, listed under "autoload": {"files": [...]}
-if (class_exists(React\EventLoop\Loop::class)) async\register(fn() => new FiberInterop\React\Adapter(), 'fiber-interop/react');
+if (class_exists(React\EventLoop\Loop::class)) fiber\register(fn() => new FiberInterop\React\Adapter(), 'fiber-interop/react');
 ```
 
-On first use an explicit `async\setup()` wins; otherwise a single candidate is built and used; two
+On first use an explicit `fiber\setup()` wins; otherwise a single candidate is built and used; two
 or more throw `NotConfiguredException` naming them. So `composer require react/event-loop fiber-interop/react` needs no
-code. With none installed, the first call throws `async\NotConfiguredException` listing the adapter
-packages. To pick one explicitly, call `async\setup(new SomeAdapter())` early. `setup()` with an
+code. With none installed, the first call throws `fiber\NotConfiguredException` listing the adapter
+packages. To pick one explicitly, call `fiber\setup(new SomeAdapter())` early. `setup()` with an
 adapter of the class already set is a no-op; one of another class throws `\LogicException`.
 
 ## Writing an adapter
 
-Implement `async\Adapter`:
+Implement `fiber\Adapter`:
 
 ```php
 interface Adapter {
@@ -176,7 +176,7 @@ interface Adapter {
   nobody has awaited the task yet; you see them only for awaited tasks and `service()` tasks.
 - **Execution units.** The api keeps a stack of `run()` frames per execution unit, keyed by
   `Fiber::getCurrent()` (a shared object for `{main}`). If your tasks are not PHP Fibers (Swoole
-  coroutines), set `\async\Registry::$executionKey = fn(): ?object => ...` (internal, but stable)
+  coroutines), set `\fiber\Registry::$executionKey = fn(): ?object => ...` (internal, but stable)
   to return the object identifying the current unit, and give the scope package the same function
   via `fiber_interop\scope\set_execution_key_provider()`.
 - Self-register from a `files` autoload entry, guarded by `class_exists()` on your loop.
@@ -193,7 +193,7 @@ the autoloader and registers it:
 ```php
 <?php // conformance-bootstrap.php
 require __DIR__ . '/vendor/autoload.php';
-async\setup(new My\Adapter());
+fiber\setup(new My\Adapter());
 ```
 
 ```bash

@@ -1,8 +1,8 @@
 <?php
-namespace async\Tests\Stress;
+namespace fiber\Tests\Stress;
 
 use PHPUnit\Framework\Attributes\Group;
-use function async\{await, go, run, sleep};
+use function fiber\{await, go, run, sleep};
 
 #[Group('stress')]
 final class OrderingTest extends StressCase
@@ -74,7 +74,7 @@ final class OrderingTest extends StressCase
             self::check(count($results) === $r, 'an awaiter vanished');
             $ref = null;
             foreach ($results as [$timeout, $v]) {
-                if ($v instanceof \async\TimeoutException) {
+                if ($v instanceof \fiber\TimeoutException) {
                     self::check($timeout !== \PHP_FLOAT_MAX, 'awaiter without timeout timed out');
                     continue;
                 }

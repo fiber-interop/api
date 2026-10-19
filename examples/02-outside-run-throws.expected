@@ -1,5 +1,5 @@
-go: async\NotInRunException
-await: async\NotInRunException
-sleep: async\NotInRunException
+go: fiber\NotInRunException
+await: fiber\NotInRunException
+sleep: fiber\NotInRunException
 run: done
 error reported: no

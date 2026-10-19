@@ -1,9 +1,9 @@
 <?php
-namespace async\Tests;
+namespace fiber\Tests;
 
-use async\NotConfiguredException;
-use async\Registry;
-use async\Tests\Support\FiberAdapter;
+use fiber\NotConfiguredException;
+use fiber\Registry;
+use fiber\Tests\Support\FiberAdapter;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__ . '/Support/FiberAdapter.php';
@@ -19,49 +19,49 @@ final class SetupTest extends TestCase
     {
         $this->expectException(NotConfiguredException::class);
         $this->expectExceptionMessage('fiber-interop/revolt');
-        \async\adapter();
+        \fiber\adapter();
     }
 
     public function testSameClassTwiceIsNoOp(): void
     {
         $first = new FiberAdapter();
-        \async\setup($first);
-        \async\setup(new FiberAdapter());
-        $this->assertSame($first, \async\adapter());
+        \fiber\setup($first);
+        \fiber\setup(new FiberAdapter());
+        $this->assertSame($first, \fiber\adapter());
     }
 
     public function testOtherClassThrows(): void
     {
-        \async\setup(new FiberAdapter());
+        \fiber\setup(new FiberAdapter());
         $this->expectException(\LogicException::class);
-        \async\setup($this->createStub(\async\Adapter::class));
+        \fiber\setup($this->createStub(\fiber\Adapter::class));
     }
 
     public function testSingleCandidateResolvesLazily(): void
     {
         $made = 0;
-        \async\register(function () use (&$made) { $made++; return new FiberAdapter(); }, 'vendor/one');
+        \fiber\register(function () use (&$made) { $made++; return new FiberAdapter(); }, 'vendor/one');
         $this->assertSame(0, $made);
-        $this->assertInstanceOf(FiberAdapter::class, \async\adapter());
-        \async\adapter();
+        $this->assertInstanceOf(FiberAdapter::class, \fiber\adapter());
+        \fiber\adapter();
         $this->assertSame(1, $made);
     }
 
     public function testTwoCandidatesThrowAtFirstUse(): void
     {
-        \async\register(fn() => new FiberAdapter(), 'vendor/one');
-        \async\register(fn() => new FiberAdapter(), 'vendor/two');
+        \fiber\register(fn() => new FiberAdapter(), 'vendor/one');
+        \fiber\register(fn() => new FiberAdapter(), 'vendor/two');
         $this->expectException(NotConfiguredException::class);
         $this->expectExceptionMessage('vendor/one, vendor/two');
-        \async\adapter();
+        \fiber\adapter();
     }
 
     public function testSetupBeatsCandidates(): void
     {
-        \async\register(fn() => throw new \LogicException('must not be built'), 'vendor/one');
-        \async\register(fn() => throw new \LogicException('must not be built'), 'vendor/two');
+        \fiber\register(fn() => throw new \LogicException('must not be built'), 'vendor/one');
+        \fiber\register(fn() => throw new \LogicException('must not be built'), 'vendor/two');
         $a = new FiberAdapter();
-        \async\setup($a);
-        $this->assertSame($a, \async\adapter());
+        \fiber\setup($a);
+        $this->assertSame($a, \fiber\adapter());
     }
 }

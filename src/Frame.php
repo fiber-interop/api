@@ -1,5 +1,5 @@
 <?php
-namespace async;
+namespace fiber;
 
 /**
  * @internal One run() (or one service task's detached group): the tasks started inside it.

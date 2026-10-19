@@ -1,5 +1,5 @@
 <?php
-namespace async;
+namespace fiber;
 
 /** A promise was rejected with a reason that is not a Throwable; getReason() returns it unchanged. */
 class RejectedException extends \RuntimeException

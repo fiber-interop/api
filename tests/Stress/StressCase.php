@@ -1,5 +1,5 @@
 <?php
-namespace async\Tests\Stress;
+namespace fiber\Tests\Stress;
 
 use PHPUnit\Framework\TestCase;
 
@@ -12,12 +12,12 @@ abstract class StressCase extends TestCase
 {
     protected function setUp(): void
     {
-        if (getenv('FIBER_INTEROP_STRESS_BOOTSTRAP') === false && \async\Registry::$adapter === null) {
+        if (getenv('FIBER_INTEROP_STRESS_BOOTSTRAP') === false && \fiber\Registry::$adapter === null) {
             if (!class_exists('Scope')) {
                 require_once __DIR__ . '/../Support/ScopeStub.php';
             }
             require_once __DIR__ . '/../Support/FiberAdapter.php';
-            \async\setup(new \async\Tests\Support\FiberAdapter());
+            \fiber\setup(new \fiber\Tests\Support\FiberAdapter());
         }
     }
 
@@ -49,7 +49,7 @@ abstract class StressCase extends TestCase
     /** Random sleep of 0..3 ms. */
     protected static function rsleep(int $maxMicros = 3000): void
     {
-        \async\sleep(mt_rand(0, $maxMicros) / 1e6);
+        \fiber\sleep(mt_rand(0, $maxMicros) / 1e6);
     }
 
     protected static function check(bool $cond, string $msg): void
