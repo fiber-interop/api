@@ -33,6 +33,7 @@ function await_all(array $awaitables, float $timeout = \PHP_FLOAT_MAX): array;
 function await_any(array $awaitables, float $timeout = \PHP_FLOAT_MAX): mixed;
 function run(callable $f, mixed ...$args): mixed;
 function service(callable $f, mixed ...$args): object;
+function current(): ?object;
 function sleep(float $seconds): void;
 function readable(mixed $resource, float $timeout = \PHP_FLOAT_MAX): mixed;
 function writable(mixed $resource, float $timeout = \PHP_FLOAT_MAX): mixed;
@@ -61,6 +62,16 @@ function adapter(): Adapter;
   `run()`. It is driven only while some `run()` is active; what happens to it after the outermost
   `run()` returns is runtime-specific, so write services to be restartable. Its failures, and those
   of tasks it starts without awaiting, go to the adapter's unhandled-error handler.
+- `current()` is the handle `go()` or `service()` returned for the task the calling code runs in,
+  so `$h === current()` answers "is `$h` me?" (a component disposing itself from one of its own
+  tasks must not wait for that task). It is `null` in `{main}`, outside `run()`, and in a fiber
+  the adapter did not create. `await(current())` throws a `LogicException`: a task cannot wait
+  for itself.
+- `fiber\Deferred` is the awaitable you settle yourself: `resolve($value)` or `reject($e)` once,
+  from any task, and every `await()` of it, earlier or later, returns or throws. It is how code
+  waits for an *event* (a stop request, data arriving, a process exiting) rather than for a task's
+  result; `await_any()` and `run()` are built on it. It is a then-able, so it is awaitable under
+  every adapter.
 - `go`, `await`, `await_all`, `await_any`, `sleep`, `readable` and `writable` throw
   `fiber\NotInRunException` (a `LogicException`) outside `run()`.
 - `sleep()` suspends cooperatively. `readable()`/`writable()` return the resource, so
@@ -179,6 +190,12 @@ interface Adapter {
   coroutines), set `\fiber\Registry::$executionKey = fn(): ?object => ...` (internal, but stable)
   to return the object identifying the current unit, and give the scope package the same function
   via `fiber_interop\scope\set_execution_key_provider()`.
+- **`current()`.** The api finds the running task's handle itself, from the execution unit, once
+  your `go()` has returned. If your `go()` runs the new task before returning (phasync and Swoole
+  do; Revolt and React queue it), the handle is unknown during the task's first stretch, until its
+  first suspension. Cover it by adding `public function current(): ?object` to your adapter (not in
+  the interface, detected by `method_exists`): return the handle your `go()` returned for the
+  running unit, `null` for units you did not create. The reference adapter does this in four lines.
 - Self-register from a `files` autoload entry, guarded by `class_exists()` on your loop.
 
 `tests/Support/FiberAdapter.php` in this repository is a complete adapter on raw Fibers and

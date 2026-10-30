@@ -63,6 +63,13 @@ final class FiberAdapter implements Adapter
         return $o instanceof Task;
     }
 
+    /** Optional in Adapter: the handle go() returned for the running fiber, null for others and {main}. */
+    public function current(): ?object
+    {
+        $fiber = \Fiber::getCurrent();
+        return $fiber === null ? null : ($this->own[$fiber] ?? null);
+    }
+
     public function await(object $o, float $timeout): mixed
     {
         if ($o instanceof Task) {

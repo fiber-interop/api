@@ -1,0 +1,10 @@
+outside run(): NULL
+run()'s task has a handle: true
+inside its task, after a suspension: true
+before its first suspension: the handle
+a service task too: true
+a task cannot await itself: LogicException
+Deferred resolved from another task: event
+Deferred rejected: no
+outside again: NULL
+error reported: no

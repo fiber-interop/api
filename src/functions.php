@@ -92,6 +92,9 @@ function await(object $awaitable, float $timeout = \PHP_FLOAT_MAX): mixed
     if (!$a->canAwait($awaitable) && !\method_exists($awaitable, 'then')) {
         throw new \TypeError(\get_debug_type($awaitable) . ' is not awaitable by ' . \get_class($a));
     }
+    if ($awaitable === current()) {
+        throw new \LogicException('await(): a task cannot await itself');
+    }
     $entry = Registry::$tasks[$awaitable] ?? null;
     if ($entry === null) {
         return $a->await($awaitable, $timeout);
@@ -102,6 +105,28 @@ function await(object $awaitable, float $timeout = \PHP_FLOAT_MAX): mixed
         throw $entry->error;
     }
     return $result;
+}
+
+/**
+ * The handle go() (or service()) returned for the task this code runs in, so that
+ * `$h === current()` tells whether $h is this task; null in {main}, outside run(), and in a
+ * fiber or coroutine the adapter did not create. The handle is as opaque as go()'s: pass it to
+ * the await functions and compare it, nothing else.
+ *
+ * The api learns the handle when the adapter's go() returns. An adapter that runs a new task
+ * before its go() returns (phasync, Swoole) implements Adapter::current() so the handle is also
+ * known in that first stretch, before the task's first suspension.
+ */
+function current(): ?object
+{
+    $a = Registry::$adapter;
+    if ($a !== null && \method_exists($a, 'current')) {
+        $c = $a->current();
+        if ($c !== null) {
+            return $c;
+        }
+    }
+    return (Registry::$current[Frame::key()] ?? null)?->task;
 }
 
 /**

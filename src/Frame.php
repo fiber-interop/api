@@ -74,8 +74,15 @@ final class Frame
         $frame = $this;
         $this->pending++;
         $a = adapter();
-        $task = $a->{$service ? 'service' : 'go'}(static function () use ($f, $frame, $entry) {
+        // current() finds the task's handle through its execution unit; the handle is known only
+        // once the adapter's go() has returned, which an eager adapter does after the task's first
+        // suspension (Adapter::current() covers that prefix).
+        $handle = new \stdClass();
+        $handle->task = null;
+        $task = $a->{$service ? 'service' : 'go'}(static function () use ($f, $frame, $entry, $handle) {
             $k = Frame::push($frame);
+            Registry::$current ??= new \WeakMap();
+            Registry::$current[$k] = $handle;
             try {
                 return $f();
             } catch (\Throwable $e) {
@@ -87,10 +94,12 @@ final class Frame
                 // the enclosing run() or a later await() rethrows it
                 return null;
             } finally {
+                unset(Registry::$current[$k]);
                 Frame::pop($k);
                 $frame->finished();
             }
         });
+        $handle->task = $task;
         if ($entry !== null) {
             $this->entries[] = $entry;
             Registry::$tasks ??= new \WeakMap();
