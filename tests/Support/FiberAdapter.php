@@ -2,6 +2,7 @@
 namespace fiber\Tests\Support;
 
 use fiber\Adapter;
+use fiber\CancelledException;
 use fiber\RejectedException;
 use fiber\Timeout;
 
@@ -68,6 +69,14 @@ final class FiberAdapter implements Adapter
     {
         $fiber = \Fiber::getCurrent();
         return $fiber === null ? null : ($this->own[$fiber] ?? null);
+    }
+
+    /** Optional in Adapter: settle the wait $task is suspended in with $reason, which resumes it throwing. */
+    public function cancel(object $task, CancelledException $reason): void
+    {
+        if ($task instanceof Task && $task->wake !== null) {
+            ($task->wake)(false, $reason);
+        }
     }
 
     public function await(object $o, float $timeout): mixed
@@ -139,7 +148,13 @@ final class FiberAdapter implements Adapter
         }
         if (!$done) {
             if ($suspend) {
-                \Fiber::suspend();
+                $task = $this->own[$fiber];
+                $task->wake = $settle;
+                try {
+                    \Fiber::suspend();
+                } finally {
+                    $task->wake = null;
+                }
             } else {
                 while (!$done) {
                     if (!$this->ready && !$this->timers && !$this->readers && !$this->writers) {
@@ -254,6 +269,8 @@ final class FiberAdapter implements Adapter
 final class Task
 {
     public bool $handled = false;
+    /** settles the wait the task's fiber is suspended in, while it is */
+    public ?\Closure $wake = null;
     private ?array $result = null;
     private array $listeners = [];
 

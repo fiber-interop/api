@@ -83,11 +83,15 @@ function go(callable $f, mixed ...$args): object
  * wrapped in RejectedException. On timeout a TimeoutException is thrown; the task keeps running
  * and its later result is ignored.
  * From a fiber the adapter did not create (and not {main}) the adapter runs its loop in place
- * instead of suspending that fiber.
+ * instead of suspending that fiber. In a cancelled task it throws the cancellation reason.
  */
 function await(object $awaitable, float $timeout = \PHP_FLOAT_MAX): mixed
 {
     Frame::current();
+    $self = (Registry::$current[Frame::key()] ?? null)?->entry;
+    if ($self?->cancelled !== null) {
+        throw $self->cancelled;
+    }
     $a = adapter();
     if (!$a->canAwait($awaitable) && !\method_exists($awaitable, 'then')) {
         throw new \TypeError(\get_debug_type($awaitable) . ' is not awaitable by ' . \get_class($a));
@@ -99,7 +103,16 @@ function await(object $awaitable, float $timeout = \PHP_FLOAT_MAX): mixed
     if ($entry !== null) {
         $entry->awaited = true;
     }
-    $result = $a->await($awaitable, $timeout);
+    if ($self !== null) {
+        $self->waiting = true;
+    }
+    try {
+        $result = $a->await($awaitable, $timeout);
+    } finally {
+        if ($self !== null) {
+            $self->waiting = false;
+        }
+    }
     // An eager adapter runs a task's body before go() returns, so a task awaiting its parent's
     // current() handle from inside that body finds no entry yet; it is registered by the time
     // the await returns.
@@ -140,6 +153,7 @@ function current(): ?object
  *
  * All awaitables are allowed to settle; then the first exception (in key order) is rethrown.
  * The timeout covers the whole call; on expiry a TimeoutException is thrown and the tasks keep running.
+ * Cancelling the calling task ends the wait at once with the reason; the tasks keep running.
  */
 function await_all(array $awaitables, float $timeout = \PHP_FLOAT_MAX): array
 {
@@ -151,7 +165,8 @@ function await_all(array $awaitables, float $timeout = \PHP_FLOAT_MAX): array
         try {
             $results[$k] = await($o, $deadline === \PHP_FLOAT_MAX ? \PHP_FLOAT_MAX : \max(0.0, $deadline - \microtime(true)));
         } catch (\Throwable $e) {
-            if ($e instanceof TimeoutException && \microtime(true) >= $deadline) {
+            if ($e instanceof TimeoutException && \microtime(true) >= $deadline
+                || $e === (Registry::$current[Frame::key()] ?? null)?->entry->cancelled) {
                 throw $e;
             }
             $error ??= $e;
@@ -197,7 +212,8 @@ function await_any(array $awaitables, float $timeout = \PHP_FLOAT_MAX): mixed
 /**
  * The only entry point, and it is structured: runs $f as a task, then waits until every task
  * started inside it (transitively, except service() tasks) has finished. Rethrows $f's exception,
- * else the first exception of a task nobody awaited, else returns $f's result. Nests freely and
+ * else the first exception of a task nobody awaited, else returns $f's result. A task that ended
+ * with the exact reason it was cancelled with counts as finished normally. Nests freely and
  * behaves the same in {main} with no loop running as inside a task.
  */
 function run(callable $f, mixed ...$args): mixed
@@ -225,7 +241,7 @@ function run(callable $f, mixed ...$args): mixed
     }
     $first = null;
     foreach ($frame->entries as $entry) {
-        if ($entry->error !== null && !$entry->awaited && ($first === null || $entry->failedAt < $first->failedAt)) {
+        if ($entry->error !== null && !$entry->awaited && $entry->error !== $entry->cancelled && ($first === null || $entry->failedAt < $first->failedAt)) {
             $first = $entry;
         }
     }
@@ -251,21 +267,83 @@ function service(callable $f, mixed ...$args): object
     return (new Frame(true))->start(static fn() => $scope->run($f, ...$args), true);
 }
 
-/** Suspend the current fiber for $seconds without blocking others. May throw CancelledException. */
+/**
+ * Cancel the task $task (a handle from go() or service()) cooperatively: its current wait (sleep,
+ * await, await_all, await_any, readable, writable) throws $reason inside it within one loop
+ * iteration, or, if it is not waiting right now, its next wait does. `finally` blocks run as usual.
+ * The reason is sticky: every later wait in that task throws it again, so cleanup after catching
+ * it must not wait. Only $task is cancelled, not the tasks it started. A finished task is left
+ * alone, and so is one already cancelled (the first reason stays). await() on a cancelled task
+ * rethrows what it ended with; run() counts a task that ended with exactly its reason as finished
+ * normally. $reason defaults to a new fiber\Cancelled.
+ *
+ * @throws NotSupportedException when the adapter has no cancel()
+ */
+function cancel(object $task, ?CancelledException $reason = null): void
+{
+    $a = adapter();
+    if (!\method_exists($a, 'cancel')) {
+        throw new NotSupportedException(\sprintf('Adapter %s does not support cancel()', \get_class($a)));
+    }
+    $entry = Registry::$tasks[$task] ?? null;
+    if ($entry === null && $task === current()) {
+        // an eager adapter's task cancelling itself before its go() has returned
+        $entry = (Registry::$current[Frame::key()] ?? null)?->entry;
+    }
+    if ($entry === null) {
+        throw new \TypeError(\get_debug_type($task) . ' is not a task started by fiber\go() or fiber\service()');
+    }
+    if ($entry->done || $entry->cancelled !== null) {
+        return;
+    }
+    $entry->cancelled = $reason ?? new Cancelled();
+    if ($entry->waiting) {
+        $a->cancel($task, $entry->cancelled);
+    }
+}
+
+/** Suspend the current fiber for $seconds without blocking others. Throws the reason in a cancelled task. */
 function sleep(float $seconds): void
 {
     Frame::current();
-    adapter()->sleep($seconds);
+    $self = (Registry::$current[Frame::key()] ?? null)?->entry;
+    if ($self === null) {
+        adapter()->sleep($seconds);
+        return;
+    }
+    if ($self->cancelled !== null) {
+        throw $self->cancelled;
+    }
+    $self->waiting = true;
+    try {
+        adapter()->sleep($seconds);
+    } finally {
+        $self->waiting = false;
+    }
 }
 
 /**
  * Wait until $resource is readable and return it, so `fread(readable($fp), 8192)` works.
- * Several fibers may wait on the same resource at once. Throws TimeoutException on timeout.
+ * Several fibers may wait on the same resource at once. Throws TimeoutException on timeout, and
+ * the reason in a cancelled task.
  */
 function readable(mixed $resource, float $timeout = \PHP_FLOAT_MAX): mixed
 {
     Frame::current();
-    adapter()->readable($resource, $timeout);
+    $self = (Registry::$current[Frame::key()] ?? null)?->entry;
+    if ($self === null) {
+        adapter()->readable($resource, $timeout);
+        return $resource;
+    }
+    if ($self->cancelled !== null) {
+        throw $self->cancelled;
+    }
+    $self->waiting = true;
+    try {
+        adapter()->readable($resource, $timeout);
+    } finally {
+        $self->waiting = false;
+    }
     return $resource;
 }
 
@@ -273,6 +351,19 @@ function readable(mixed $resource, float $timeout = \PHP_FLOAT_MAX): mixed
 function writable(mixed $resource, float $timeout = \PHP_FLOAT_MAX): mixed
 {
     Frame::current();
-    adapter()->writable($resource, $timeout);
+    $self = (Registry::$current[Frame::key()] ?? null)?->entry;
+    if ($self === null) {
+        adapter()->writable($resource, $timeout);
+        return $resource;
+    }
+    if ($self->cancelled !== null) {
+        throw $self->cancelled;
+    }
+    $self->waiting = true;
+    try {
+        adapter()->writable($resource, $timeout);
+    } finally {
+        $self->waiting = false;
+    }
     return $resource;
 }

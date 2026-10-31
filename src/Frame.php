@@ -70,15 +70,17 @@ final class Frame
     /** Starts $f as a task of this frame; the task's own go() calls land in this frame too. */
     public function start(\Closure $f, bool $service = false): object
     {
-        $entry = $this->detached ? null : new TaskEntry();
+        $entry = new TaskEntry();
         $frame = $this;
         $this->pending++;
         $a = adapter();
         // current() finds the task's handle through its execution unit; the handle is known only
         // once the adapter's go() has returned, which an eager adapter does after the task's first
-        // suspension (Adapter::current() covers that prefix).
+        // suspension (Adapter::current() covers that prefix). The entry is known from the start,
+        // so the waits can see a cancellation.
         $handle = new \stdClass();
         $handle->task = null;
+        $handle->entry = $entry;
         $task = $a->{$service ? 'service' : 'go'}(static function () use ($f, $frame, $entry, $handle) {
             $k = Frame::push($frame);
             Registry::$current ??= new \WeakMap();
@@ -86,7 +88,8 @@ final class Frame
             try {
                 return $f();
             } catch (\Throwable $e) {
-                if ($entry === null || $entry->awaited) {
+                // a detached task's failure goes to the adapter, unless it is its own cancellation
+                if ($entry->awaited || ($frame->detached && $e !== $entry->cancelled)) {
                     throw $e;
                 }
                 $entry->error = $e;
@@ -94,17 +97,18 @@ final class Frame
                 // the enclosing run() or a later await() rethrows it
                 return null;
             } finally {
+                $entry->done = true;
                 unset(Registry::$current[$k]);
                 Frame::pop($k);
                 $frame->finished();
             }
         });
         $handle->task = $task;
-        if ($entry !== null) {
+        if (!$this->detached) {
             $this->entries[] = $entry;
-            Registry::$tasks ??= new \WeakMap();
-            Registry::$tasks[$task] = $entry;
         }
+        Registry::$tasks ??= new \WeakMap();
+        Registry::$tasks[$task] = $entry;
         return $task;
     }
 }

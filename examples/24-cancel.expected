@@ -1,0 +1,14 @@
+sleeper's finally ran
+await rethrew fiber\Cancelled: Cancelled
+ended well under a second: true
+reader: reader stopped, the same object: true
+cancelled before it waited: Cancelled
+cancel(current()) returned
+sleep(0) threw: Cancelled
+second sleep(0) threw the same reason: true
+self-cancelled task: caught and returned
+finished task still gives: 42
+run returned normally
+unawaited cancelled task: run returned normally
+run rethrew: cleanup failed
+error reported: no

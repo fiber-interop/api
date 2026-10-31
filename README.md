@@ -34,6 +34,7 @@ function await_any(array $awaitables, float $timeout = \PHP_FLOAT_MAX): mixed;
 function run(callable $f, mixed ...$args): mixed;
 function service(callable $f, mixed ...$args): object;
 function current(): ?object;
+function cancel(object $task, ?CancelledException $reason = null): void;
 function sleep(float $seconds): void;
 function readable(mixed $resource, float $timeout = \PHP_FLOAT_MAX): mixed;
 function writable(mixed $resource, float $timeout = \PHP_FLOAT_MAX): mixed;
@@ -67,6 +68,26 @@ function adapter(): Adapter;
   tasks must not wait for that task). It is `null` in `{main}`, outside `run()`, and in a fiber
   the adapter did not create. `await(current())` throws a `LogicException`: a task cannot wait
   for itself.
+- `cancel($task, $reason)` cancels a task cooperatively (`$task` is a handle from `go()` or
+  `service()`). If the task is suspended in a wait (`sleep`, `await`, `await_all`, `await_any`,
+  `readable`, `writable`), that wait throws `$reason` inside it within one loop iteration; if it is
+  not waiting right now (not started yet, running, or cancelling itself with `cancel(current())`),
+  its next wait throws it. `finally` blocks run as usual. `$reason` defaults to a new
+  `fiber\Cancelled` (an `\Exception` implementing `fiber\CancelledException`, message
+  `Cancelled`). The task's body ends with that exception unless it catches it; `await()` on the
+  task rethrows it, and `run()` counts a task that ended with exactly its reason (the same object)
+  as finished normally, not as an unawaited failure. A task that catches the reason and throws
+  something else fails as usual.
+  - **Sticky.** Once cancelled, every later wait in that task throws the same reason again, so
+    cleanup after catching it must not wait. Calling `cancel()` again keeps the first reason.
+  - **Not children.** Only the task itself is cancelled, not the tasks it started; cancel those
+    yourself (from a `finally`, which runs on cancellation) if they should stop too.
+  - `cancel()` on a finished task is a no-op. An object that is not a task handle is a `TypeError`.
+  - An adapter without native cancellation makes `cancel()` throw `fiber\NotSupportedException`.
+- `fiber\NotSupportedException` (a `LogicException`) is thrown by any `fiber\` function whose
+  feature the installed adapter has no native way to provide; the message names the adapter class
+  and the feature (`Adapter X does not support cancel()`). Code that avoids the feature runs on that
+  adapter unchanged.
 - `fiber\Deferred` is the awaitable you settle yourself: `resolve($value)` or `reject($e)` once,
   from any task, and every `await()` of it, earlier or later, returns or throws. It is how code
   waits for an *event* (a stop request, data arriving, a process exiting) rather than for a task's
@@ -91,8 +112,9 @@ Rules every adapter honours (each has a conformance example):
 - **Timeout** throws an object implementing `fiber\TimeoutException` (`fiber\Timeout` if the loop
   has no own class). The awaited task keeps running and its later result is ignored.
   A timeout is a deadline on waiting, not on execution: a task that never finishes holds its
-  `run()` open, and nothing in 1.0 can stop it from outside. Cooperative cancellation is the
-  planned follow-up, which is why `CancelledException` already exists.
+  `run()` open until something calls `cancel()` on it. A timeout and a cancellation are different
+  exceptions: a timeout never throws a `CancelledException`, and a cancellation never a
+  `TimeoutException`.
 - **Readiness** means the next operation will not block, as for `select()`: EOF, a peer close and
   an error all make `readable()` and `writable()` return (the following read or write returns
   `''`/`false` without blocking). A local `fclose()` of a resource while fibers wait on it also
@@ -107,8 +129,19 @@ Rules every adapter honours (each has a conformance example):
 - **Unawaited task exceptions** are rethrown by the enclosing `run()`. Those of `service()` tasks
   (which no `run()` owns) go to the loop's unhandled-error mechanism (Revolt's error handler,
   React's rejection handler, phasync's context handler). Never silently dropped.
-- **Cancellation** is not in 1.0. `sleep()` and the waits may throw an object implementing
-  `fiber\CancelledException` when the owning loop cancels the task.
+- **Cancellation** (optional; without it `cancel()` throws `NotSupportedException`). Add
+  `public function cancel(object $task, \fiber\CancelledException $reason): void` to the adapter
+  (not in the interface, detected by `method_exists`). It must make the wait `$task` (a handle your
+  `go()` or `service()` returned) is suspended in throw `$reason`, the same object, inside that
+  task within one loop iteration, using the loop's own cancellation primitive: cancel the timer, IO
+  watcher or awaiter subscription and resume the task with the exception. The api calls it only
+  while the task is suspended in one of your `sleep()`, `await()`, `readable()` or `writable()`;
+  it marks a task as waiting around every call it makes to those, records the reason itself and
+  throws it from the task's next wait when the task is not waiting, so the adapter never has to
+  remember a cancellation. If the wait has already completed but the task has not resumed yet, it
+  may return normally; the api throws the reason from the next wait. `sleep()` and the waits may
+  also throw an object implementing `fiber\CancelledException` when the loop itself cancels the
+  task. Example 24 checks it.
 - **Foreign fibers.** Waiting from a fiber the adapter did not create (and not `{main}`) does not
   suspend that fiber; the adapter runs its loop in place until the wait completes. Nested in-place
   waits across two different loops can order badly; adapters raise a clear error after the timeout
@@ -196,6 +229,9 @@ interface Adapter {
   first suspension. Cover it by adding `public function current(): ?object` to your adapter (not in
   the interface, detected by `method_exists`): return the handle your `go()` returned for the
   running unit, `null` for units you did not create. The reference adapter does this in four lines.
+- **`cancel()`.** Optional, also detected by `method_exists`; see the cancellation rule above. The
+  reference adapter keeps the suspended wait's settle callback on its task handle and calls it with
+  the reason.
 - Self-register from a `files` autoload entry, guarded by `class_exists()` on your loop.
 
 `tests/Support/FiberAdapter.php` in this repository is a complete adapter on raw Fibers and

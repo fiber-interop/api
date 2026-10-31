@@ -22,7 +22,7 @@ final class Registry
     public static array $active = [];
     /** @var ?\WeakMap<object, TaskEntry> task handle => its frame bookkeeping */
     public static ?\WeakMap $tasks = null;
-    /** @var ?\WeakMap<object, object{task: ?object}> execution unit => the handle go() returned for it (filled once go() has) */
+    /** @var ?\WeakMap<object, object{task: ?object, entry: TaskEntry}> execution unit => the handle go() returned for it (filled once go() has) and its entry */
     public static ?\WeakMap $current = null;
     /** stands in for {main} as a WeakMap key */
     public static ?object $main = null;
