@@ -4,6 +4,8 @@ inside its task, after a suspension: true
 before its first suspension: the handle
 a service task too: true
 a task cannot await itself: LogicException
+a watcher started inside a failing task: saw boom
+the task's own awaiter too: boom
 Deferred resolved from another task: event
 Deferred rejected: no
 outside again: NULL

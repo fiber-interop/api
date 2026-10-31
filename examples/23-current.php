@@ -25,6 +25,27 @@ run(function () {
     } catch (\LogicException $e) {
         echo "a task cannot await itself: LogicException\n";
     }
+    // a task started inside another may await that task through the handle current() gave it
+    $seen = new fiber\Deferred();
+    $failing = go(function () use ($seen) {
+        $me = current();
+        go(function () use ($me, $seen) {
+            try {
+                await($me);
+                $seen->resolve('returned normally');
+            } catch (\RuntimeException $e) {
+                $seen->resolve('saw ' . $e->getMessage());
+            }
+        });
+        sleep(0.01);
+        throw new \RuntimeException('boom');
+    });
+    echo "a watcher started inside a failing task: ", await($seen), "\n";
+    try {
+        await($failing);
+    } catch (\RuntimeException $e) {
+        echo "the task's own awaiter too: ", $e->getMessage(), "\n";
+    }
     $d = new fiber\Deferred();
     go(function () use ($d) { sleep(0.01); $d->resolve('event'); });
     echo "Deferred resolved from another task: ", await($d), "\n";

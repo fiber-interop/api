@@ -96,13 +96,19 @@ function await(object $awaitable, float $timeout = \PHP_FLOAT_MAX): mixed
         throw new \LogicException('await(): a task cannot await itself');
     }
     $entry = Registry::$tasks[$awaitable] ?? null;
-    if ($entry === null) {
-        return $a->await($awaitable, $timeout);
+    if ($entry !== null) {
+        $entry->awaited = true;
     }
-    $entry->awaited = true;
     $result = $a->await($awaitable, $timeout);
-    if ($entry->error !== null) {
-        throw $entry->error;
+    // An eager adapter runs a task's body before go() returns, so a task awaiting its parent's
+    // current() handle from inside that body finds no entry yet; it is registered by the time
+    // the await returns.
+    $entry ??= Registry::$tasks[$awaitable] ?? null;
+    if ($entry !== null) {
+        $entry->awaited = true;
+        if ($entry->error !== null) {
+            throw $entry->error;
+        }
     }
     return $result;
 }
