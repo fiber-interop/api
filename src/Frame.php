@@ -3,7 +3,8 @@ namespace fiber;
 
 /**
  * @internal One run() (or one service task's detached group): the tasks started inside it.
- * run() drains it; a detached frame belongs to a service task and is never drained.
+ * run() drains it; a detached frame belongs to a service task and is never drained. Code
+ * outside the api sees a frame only as the opaque handle `fiber\frame()` returns, for `cancel()`.
  */
 final class Frame
 {
@@ -11,8 +12,43 @@ final class Frame
     /** @var list<TaskEntry> */
     public array $entries = [];
     public ?Deferred $idle = null;
+    /** The frame of the run() this run() is nested in (null: outermost, or detached). */
+    public ?Frame $parent = null;
+    /** @var array<int, Frame> the nested run()s in progress, by object id */
+    public array $children = [];
+    /** Set by cancel(): every task of the frame got it, and a task started later gets it at its first wait. */
+    public ?CancelledException $cancelled = null;
+    /** @var ?\Closure(\Throwable): void told of each failure of a task nobody has awaited, as it happens (fiber\on_failure()) */
+    public ?\Closure $onFailure = null;
 
     public function __construct(public readonly bool $detached = false) {}
+
+    /**
+     * Cancel every task of this frame and of the run()s nested in it (not services: they have no
+     * frame), each with $reason as `fiber\cancel()` does; the frame stays cancelled, so a task
+     * started in it afterwards throws $reason at its first wait. Nothing happens twice.
+     */
+    public function cancel(CancelledException $reason): void
+    {
+        if ($this->cancelled !== null) {
+            return;
+        }
+        $this->cancelled = $reason;
+        $a = adapter();
+        foreach ($this->entries as $entry) {
+            if ($entry->done || $entry->cancelled !== null) {
+                continue;
+            }
+            $entry->cancelled = $reason;
+            $task = $entry->task?->get();
+            if ($entry->waiting && $task !== null) {
+                $a->cancel($task, $reason);
+            }
+        }
+        foreach ($this->children as $child) {
+            $child->cancel($reason);
+        }
+    }
 
     public function finished(): void
     {
@@ -71,6 +107,7 @@ final class Frame
     public function start(\Closure $f, bool $service = false): object
     {
         $entry = new TaskEntry();
+        $entry->cancelled = $this->cancelled;      // (a frame cancelled already: the task ends at its first wait)
         $frame = $this;
         $this->pending++;
         $a = adapter();
@@ -94,7 +131,10 @@ final class Frame
                 }
                 $entry->error = $e;
                 $entry->failedAt = ++TaskEntry::$failures;
-                // the enclosing run() or a later await() rethrows it
+                // the enclosing run() or a later await() rethrows it; the frame's listener hears of it now
+                if ($frame->onFailure !== null && $e !== $entry->cancelled) {
+                    ($frame->onFailure)($e);
+                }
                 return null;
             } finally {
                 $entry->done = true;
@@ -104,6 +144,7 @@ final class Frame
             }
         });
         $handle->task = $task;
+        $entry->task = \WeakReference::create($task);
         if (!$this->detached) {
             $this->entries[] = $entry;
         }

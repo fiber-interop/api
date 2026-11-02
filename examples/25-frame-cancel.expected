@@ -1,0 +1,18 @@
+frame() is the same object each time: true
+nested run() has a frame of its own: true
+cancel(frame()) returned in the task that called it
+its own next wait threw: quit
+run returned normally: its body ended with the frame's own cancellation
+body: quit
+late task started
+late task: quit
+nested task: quit
+task: quit
+all ended well under a second: true
+on_failure: RuntimeException: worker broke
+the other task's finally ran
+run rethrew the failure: worker broke, under a second: true
+awaited failure caught by the awaiter: awaited
+run returned normally
+frame() outside run(): fiber\NotInRunException
+error reported: no

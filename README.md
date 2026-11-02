@@ -35,6 +35,8 @@ function run(callable $f, mixed ...$args): mixed;
 function service(callable $f, mixed ...$args): object;
 function current(): ?object;
 function cancel(object $task, ?CancelledException $reason = null): void;
+function frame(): object;
+function on_failure(\Closure $handler): void;
 function sleep(float $seconds): void;
 function readable(mixed $resource, float $timeout = \PHP_FLOAT_MAX): mixed;
 function writable(mixed $resource, float $timeout = \PHP_FLOAT_MAX): mixed;
@@ -81,9 +83,28 @@ function adapter(): Adapter;
   - **Sticky.** Once cancelled, every later wait in that task throws the same reason again, so
     cleanup after catching it must not wait. Calling `cancel()` again keeps the first reason.
   - **Not children.** Only the task itself is cancelled, not the tasks it started; cancel those
-    yourself (from a `finally`, which runs on cancellation) if they should stop too.
-  - `cancel()` on a finished task is a no-op. An object that is not a task handle is a `TypeError`.
+    yourself (from a `finally`, which runs on cancellation), or cancel the frame (below).
+  - `cancel()` on a finished task is a no-op. An object that is neither a task handle nor a frame
+    is a `TypeError`.
   - An adapter without native cancellation makes `cancel()` throw `fiber\NotSupportedException`.
+- `frame()` is the frame of the calling code: the innermost `run()` it is inside, as an opaque
+  handle (only `cancel()` takes it; it is the same object for every call inside that `run()`, and
+  another one inside a nested `run()`). Outside `run()`: `NotInRunException`.
+  `cancel(frame(), $reason)` cancels every task of that `run()` and of the `run()`s nested in it,
+  each as `cancel($task)` does, with the same reason object, and keeps the frame cancelled: a task
+  started in it afterwards throws the reason at its first wait. Services are not touched (they
+  have no frame). The body of the `run()` is a task of the frame too, so it gets the reason at its
+  next wait; a body that ends with exactly the frame's reason makes `run()` return normally
+  (`null`), as a task ending with its own reason is not a failure. This is how a program ends
+  everything it started from anywhere inside it. Example 25.
+- `on_failure($handler)` tells `$handler(\Throwable $e)` of each failure of a task of the current
+  frame that nobody has awaited, as it happens (in the failing task, before it ends), where
+  `run()` alone would report it only once every task of the frame had ended. The failure is still
+  rethrown by `run()` or by a later `await()` of the task; a cancellation (a task ending with its
+  reason) is not a failure. One handler per frame, the last one set. A program that must not go
+  on without one of its tasks (a screen whose background worker died) ends from the handler:
+  `on_failure(fn() => cancel(frame()))`. On an adapter that runs a task's body eagerly (phasync),
+  a task failing before its `go()` returns is one nobody could have awaited yet. Example 25.
 - `fiber\NotSupportedException` (a `LogicException`) is thrown by any `fiber\` function whose
   feature the installed adapter has no native way to provide; the message names the adapter class
   and the feature (`Adapter X does not support cancel()`). Code that avoids the feature runs on that
@@ -141,7 +162,8 @@ Rules every adapter honours (each has a conformance example):
   remember a cancellation. If the wait has already completed but the task has not resumed yet, it
   may return normally; the api throws the reason from the next wait. `sleep()` and the waits may
   also throw an object implementing `fiber\CancelledException` when the loop itself cancels the
-  task. Example 24 checks it.
+  task. Example 24 checks it; example 25 checks frame cancellation, which the api builds on it
+  (one `cancel()` per waiting task of the frame).
 - **Foreign fibers.** Waiting from a fiber the adapter did not create (and not `{main}`) does not
   suspend that fiber; the adapter runs its loop in place until the wait completes. Nested in-place
   waits across two different loops can order badly; adapters raise a clear error after the timeout

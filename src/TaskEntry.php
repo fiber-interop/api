@@ -17,4 +17,6 @@ final class TaskEntry
     /** True while the task is inside an adapter wait called by a fiber\ wait function. */
     public bool $waiting = false;
     public bool $done = false;
+    /** @var ?\WeakReference<object> the adapter's handle, once go() has returned it (a frame cancel needs it); weak, so the handle's own life decides */
+    public ?\WeakReference $task = null;
 }

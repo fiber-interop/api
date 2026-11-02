@@ -76,4 +76,95 @@ final class CancelTest extends TestCase
         $this->expectException(\TypeError::class);
         \fiber\run(fn() => \fiber\cancel(new \stdClass()));
     }
+
+    public function testFrameCancelEndsEveryTaskOfTheRunAndNestedRunsButNotServices(): void
+    {
+        \fiber\setup(new FiberAdapter());
+        $log = [];
+        $started = microtime(true);
+        $result = \fiber\run(function () use (&$log) {
+            $frame = \fiber\frame();
+            $this->assertSame($frame, \fiber\frame());
+            \fiber\go(function () use (&$log) {
+                try { \fiber\sleep(10); } catch (CancelledException $e) { $log[] = 'task:' . $e->getMessage(); }
+            });
+            \fiber\go(function () use (&$log, $frame) {
+                \fiber\run(function () use (&$log, $frame) {
+                    $this->assertNotSame($frame, \fiber\frame());
+                    \fiber\go(function () use (&$log) {
+                        try { \fiber\sleep(10); } catch (CancelledException $e) { $log[] = 'nested:' . $e->getMessage(); }
+                    });
+                });
+            });
+            \fiber\go(function () use ($frame) { \fiber\sleep(0.01); \fiber\cancel($frame, new Cancelled('quit')); });
+            try { \fiber\sleep(10); } catch (CancelledException $e) { $log[] = 'body:' . $e->getMessage(); }
+            \fiber\go(function () use (&$log) {       // started in a cancelled frame
+                try { \fiber\sleep(0); $log[] = 'late slept'; } catch (CancelledException $e) { $log[] = 'late:' . $e->getMessage(); }
+            });
+            \fiber\sleep(1);                          // the frame's reason: run() returns normally
+            return 'not reached';
+        });
+        sort($log);
+        $this->assertNull($result);
+        $this->assertSame(['body:quit', 'late:quit', 'nested:quit', 'task:quit'], $log);
+        $this->assertLessThan(0.5, microtime(true) - $started);
+    }
+
+    public function testFrameCancelIsIdempotentAndKeepsTheFirstReason(): void
+    {
+        \fiber\setup(new FiberAdapter());
+        $seen = \fiber\run(function () {
+            $first = new Cancelled('first');
+            \fiber\cancel(\fiber\frame(), $first);
+            \fiber\cancel(\fiber\frame(), new Cancelled('second'));
+            try { \fiber\sleep(0); } catch (CancelledException $e) { return $e; }
+            return null;
+        });
+        $this->assertSame('first', $seen?->getMessage());
+    }
+
+    public function testOnFailureHearsOfAnUnawaitedFailureAtOnceAndCanEndTheRun(): void
+    {
+        \fiber\setup(new FiberAdapter());
+        $heard = [];
+        $started = microtime(true);
+        try {
+            \fiber\run(function () use (&$heard) {
+                \fiber\on_failure(function (\Throwable $e) use (&$heard) {
+                    $heard[] = $e->getMessage();
+                    \fiber\cancel(\fiber\frame());
+                });
+                \fiber\go(function () { \fiber\sleep(0.01); throw new \RuntimeException('worker broke'); });
+                \fiber\go(fn() => \fiber\sleep(10));
+                \fiber\sleep(10);
+            });
+            $this->fail('run() should rethrow the failure');
+        } catch (\RuntimeException $e) {
+            $this->assertSame('worker broke', $e->getMessage());
+        }
+        $this->assertSame(['worker broke'], $heard);
+        $this->assertLessThan(0.5, microtime(true) - $started);
+    }
+
+    public function testOnFailureIgnoresCancellationsAndAwaitedFailures(): void
+    {
+        \fiber\setup(new FiberAdapter());
+        $heard = [];
+        \fiber\run(function () use (&$heard) {
+            \fiber\on_failure(function (\Throwable $e) use (&$heard) { $heard[] = $e->getMessage(); });
+            $t = \fiber\go(fn() => \fiber\sleep(10));
+            \fiber\sleep(0.01);
+            \fiber\cancel($t);
+            $failing = \fiber\go(function () { \fiber\sleep(0.01); throw new \LogicException('awaited'); });
+            try { \fiber\await($failing); } catch (\LogicException) {}
+        });
+        $this->assertSame([], $heard);
+    }
+
+    public function testFrameOutsideRunThrows(): void
+    {
+        \fiber\setup(new FiberAdapter());
+        $this->expectException(\fiber\NotInRunException::class);
+        \fiber\frame();
+    }
 }

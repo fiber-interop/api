@@ -219,6 +219,13 @@ function await_any(array $awaitables, float $timeout = \PHP_FLOAT_MAX): mixed
 function run(callable $f, mixed ...$args): mixed
 {
     $frame = new Frame();
+    try {
+        // nested in a task: a child frame, cancelled with its parent's
+        $frame->parent = Frame::current();
+        $frame->parent->children[\spl_object_id($frame)] = $frame;
+        $frame->cancelled = $frame->parent->cancelled;
+    } catch (NotInRunException) {
+    }
     $k = Frame::push($frame);
     Registry::$active[\spl_object_id($frame)] = $frame;
     $error = null;
@@ -226,7 +233,11 @@ function run(callable $f, mixed ...$args): mixed
         try {
             $result = await(go($f, ...$args));
         } catch (\Throwable $e) {
-            $error = $e;
+            // the body ending with its frame's own cancellation is the frame ending as asked, not a failure
+            if ($e !== $frame->cancelled) {
+                $error = $e;
+            }
+            $result = null;
         }
         while ($frame->pending > 0) {
             $frame->idle = new Deferred();
@@ -234,6 +245,9 @@ function run(callable $f, mixed ...$args): mixed
         }
     } finally {
         unset(Registry::$active[\spl_object_id($frame)]);
+        if ($frame->parent !== null) {
+            unset($frame->parent->children[\spl_object_id($frame)]);
+        }
         Frame::pop($k);
     }
     if ($error !== null) {
@@ -285,13 +299,17 @@ function cancel(object $task, ?CancelledException $reason = null): void
     if (!\method_exists($a, 'cancel')) {
         throw new NotSupportedException(\sprintf('Adapter %s does not support cancel()', \get_class($a)));
     }
+    if ($task instanceof Frame) {
+        $task->cancel($reason ?? new Cancelled());
+        return;
+    }
     $entry = Registry::$tasks[$task] ?? null;
     if ($entry === null && $task === current()) {
         // an eager adapter's task cancelling itself before its go() has returned
         $entry = (Registry::$current[Frame::key()] ?? null)?->entry;
     }
     if ($entry === null) {
-        throw new \TypeError(\get_debug_type($task) . ' is not a task started by fiber\go() or fiber\service()');
+        throw new \TypeError(\get_debug_type($task) . ' is not a task started by fiber\go() or fiber\service(), nor a frame from fiber\frame()');
     }
     if ($entry->done || $entry->cancelled !== null) {
         return;
@@ -300,6 +318,35 @@ function cancel(object $task, ?CancelledException $reason = null): void
     if ($entry->waiting) {
         $a->cancel($task, $entry->cancelled);
     }
+}
+
+/**
+ * The frame of the calling code: the innermost run() it is inside, as an opaque handle for
+ * `cancel()`. Cancelling a frame cancels every task started in that run() and in the run()s
+ * nested in it (each as `cancel($task)` does), not its services, and a task started in it
+ * afterwards throws the reason at its first wait; the run() then returns (or rethrows) once
+ * they have unwound. The way a program ends everything it started: `cancel(frame())`.
+ *
+ * @throws NotInRunException outside run()
+ */
+function frame(): object
+{
+    return Frame::current();
+}
+
+/**
+ * Tell $handler of each failure of a task of the current frame that nobody has awaited, as it
+ * happens (in the failing task, before it ends), instead of only when run() ends. The failure
+ * is still rethrown by run() (or by a later await of the task). A frame has one handler; the
+ * last one set wins. A program that must not go on without one of its tasks cancels its frame
+ * from here: `on_failure(fn() => cancel(frame()))`. Cancellations are not failures.
+ *
+ * @param \Closure(\Throwable): void $handler
+ * @throws NotInRunException outside run()
+ */
+function on_failure(\Closure $handler): void
+{
+    Frame::current()->onFailure = $handler;
 }
 
 /** Suspend the current fiber for $seconds without blocking others. Throws the reason in a cancelled task. */
