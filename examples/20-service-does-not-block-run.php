@@ -4,10 +4,10 @@
 use function fiber\{go, await, await_all, await_any, run, service, sleep, readable, writable};
 
 // a service task does not count towards run(): run() returns while it still sleeps
-$t = microtime(true);
-run(function () {
-    service(function () { sleep(0.2); });
+$woke = false;
+run(function () use (&$woke) {
+    service(function () use (&$woke) { sleep(10); $woke = true; });
     sleep(0.01);
     echo "f done\n";
 });
-echo "run returned before the service woke: ", var_export(microtime(true) - $t < 0.15, true), "\n";
+echo "run returned before the service woke: ", var_export(!$woke, true), "\n";
